@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Register — SmartBMS{% endblock %}
+{% block navbar %}{% endblock %}
+
+{% block content %}
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <div style="max-width:440px;margin:1rem auto 0;padding:0 1.5rem;">
+      {% for category, message in messages %}
+        <div class="flash {{ category }}">
+          {% if category == 'success' %}✓{% else %}✕{% endif %} {{ message }}
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}
+
+<div class="auth-wrap">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <a href="{{ url_for('index') }}" style="display:inline-flex;align-items:center;gap:8px;color:var(--text);font-family:'Syne',sans-serif;font-weight:800;font-size:1.2rem;margin-bottom:0.5rem;">
+        <span style="width:10px;height:10px;border-radius:50%;background:var(--accent);box-shadow:0 0 12px var(--accent);display:inline-block;"></span>
+        SmartBMS
+      </a>
+      <h2>Create an account</h2>
+      <p>Join SmartBMS and start managing your business</p>
+    </div>
+
+    <form method="POST">
+      <div class="form-group">
+        <label for="name">Full Name</label>
+        <input type="text" id="name" name="name" placeholder="Jane Smith" required autocomplete="name">
+      </div>
+      <div class="form-group">
+        <label for="email">Email Address</label>
+        <input type="email" id="email" name="email" placeholder="jane@example.com" required autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" placeholder="Min. 6 characters" required autocomplete="new-password">
+      </div>
+      <div class="form-group">
+        <label for="confirm">Confirm Password</label>
+        <input type="password" id="confirm" name="confirm" placeholder="Repeat password" required autocomplete="new-password">
+      </div>
+      <button type="submit" class="btn btn-primary btn-full">Create Account</button>
+    </form>
+
+    <div class="auth-footer">
+      Already have an account? <a href="{{ url_for('login') }}">Sign in</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

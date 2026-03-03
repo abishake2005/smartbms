@@ -1,0 +1,50 @@
+{% extends "app_base.html" %}
+{% block title %}Profile — SmartBMS{% endblock %}
+
+{% block app_content %}
+<div class="page-header">
+  <h1>Profile</h1>
+  <p>Manage your account settings and security.</p>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;max-width:760px;">
+
+  <div class="card">
+    <p class="card-title">Account Info</p>
+    <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.5rem;">
+      <div class="avatar" style="width:52px;height:52px;font-size:1.3rem;">
+        {{ user['name'][0].upper() }}
+      </div>
+      <div>
+        <div style="font-weight:700;font-size:1.05rem;">{{ user['name'] }}</div>
+        <div class="text-muted text-sm">{{ user['email'] }}</div>
+      </div>
+    </div>
+    <div class="divider"></div>
+    <div style="font-size:0.85rem;color:var(--text-muted);">
+      <div style="margin-bottom:0.5rem;"><strong style="color:var(--text);">ID:</strong> #{{ user['id'] }}</div>
+      <div><strong style="color:var(--text);">Email:</strong> {{ user['email'] }}</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <p class="card-title">Change Password</p>
+    <form method="POST">
+      <div class="form-group">
+        <label for="old_password">Current Password</label>
+        <input type="password" id="old_password" name="old_password" placeholder="Enter current password" required>
+      </div>
+      <div class="form-group">
+        <label for="new_password">New Password</label>
+        <input type="password" id="new_password" name="new_password" placeholder="Min. 6 characters" required>
+      </div>
+      <div class="form-group">
+        <label for="confirm_password">Confirm New Password</label>
+        <input type="password" id="confirm_password" name="confirm_password" placeholder="Repeat new password" required>
+      </div>
+      <button type="submit" class="btn btn-primary btn-full">Update Password</button>
+    </form>
+  </div>
+
+</div>
+{% endblock %}

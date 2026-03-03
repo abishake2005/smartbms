@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}SmartBMS — Business Management System{% endblock %}
+
+{% block content %}
+<section class="hero">
+  <div class="hero-content">
+    <div class="hero-badge">✦ Business Management Platform</div>
+    <h1>Run Your Business with Clarity</h1>
+    <p>SmartBMS gives you the tools to manage clients, track services, and grow your business — all in one secure, modern platform.</p>
+    <div class="hero-cta">
+      <a href="{{ url_for('register') }}" class="btn btn-primary">Start for Free</a>
+      <a href="{{ url_for('login') }}" class="btn btn-secondary">Sign In</a>
+    </div>
+  </div>
+</section>
+
+<section class="features">
+  <div class="container">
+    <p class="section-label">Features</p>
+    <h2 class="section-title">Everything You Need</h2>
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="icon">🔐</div>
+        <h3>Secure Authentication</h3>
+        <p>Hashed passwords, session protection, and SQL injection prevention built in.</p>
+      </div>
+      <div class="feature-card">
+        <div class="icon">📊</div>
+        <h3>Live Dashboard</h3>
+        <p>Real-time stats on users and services at a glance.</p>
+      </div>
+      <div class="feature-card">
+        <div class="icon">⚙️</div>
+        <h3>Service Management</h3>
+        <p>Add, edit, and delete services with prices and descriptions effortlessly.</p>
+      </div>
+      <div class="feature-card">
+        <div class="icon">👤</div>
+        <h3>User Profile</h3>
+        <p>Update your password securely with old-password validation.</p>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

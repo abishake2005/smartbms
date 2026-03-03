@@ -1,0 +1,64 @@
+{% extends "app_base.html" %}
+{% block title %}Dashboard — SmartBMS{% endblock %}
+
+{% block app_content %}
+<div class="page-header">
+  <h1>Dashboard</h1>
+  <p>Welcome back, {{ session.get('user_name') }} — here's your overview.</p>
+</div>
+
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="stat-icon">👥</div>
+    <div class="stat-value">{{ total_users }}</div>
+    <div class="stat-label">Total Users</div>
+  </div>
+  <div class="stat-card green">
+    <div class="stat-icon">⚙️</div>
+    <div class="stat-value">{{ total_services }}</div>
+    <div class="stat-label">My Services</div>
+  </div>
+</div>
+
+<div class="card">
+  <p class="card-title">Recent Services</p>
+  {% if recent_services %}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Service</th>
+            <th>Description</th>
+            <th>Price</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in recent_services %}
+          <tr>
+            <td><strong>{{ s['service_name'] }}</strong></td>
+            <td class="text-muted text-sm">{{ s['description'] or '—' }}</td>
+            <td><span class="price-tag">${{ '%.2f'|format(s['price']) }}</span></td>
+            <td>
+              <div class="td-actions">
+                <a href="{{ url_for('edit_service', service_id=s['id']) }}" class="btn btn-secondary btn-sm">Edit</a>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div style="margin-top:1rem;">
+      <a href="{{ url_for('services') }}" class="btn btn-secondary btn-sm">View All Services →</a>
+    </div>
+  {% else %}
+    <div class="empty-state">
+      <div class="empty-icon">📭</div>
+      <h3>No services yet</h3>
+      <p>Add your first service to get started.</p>
+      <a href="{{ url_for('add_service') }}" class="btn btn-primary" style="margin-top:1rem;">Add Service</a>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}
