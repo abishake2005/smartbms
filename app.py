@@ -1,35 +1,35 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 from werkzeug.security import generate_password_hash, check_password_hash
-import sqlite3
 import os
+import psycopg2
+import psycopg2.extras
 
 app = Flask(__name__)
-app.secret_key = os.urandom(24)
-
-DB = 'business.db'
+app.secret_key = os.environ.get('SECRET_KEY', 'smartbms-secret-2026')
+DATABASE_URL = os.environ.get('DATABASE_URL')
 
 def get_db():
-    conn = sqlite3.connect(DB)
-    conn.row_factory = sqlite3.Row
+    conn = psycopg2.connect(DATABASE_URL)
     return conn
 
 def init_db():
     conn = get_db()
-    conn.execute('''CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+    cur = conn.cursor()
+    cur.execute('''CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
         name TEXT NOT NULL,
         email TEXT UNIQUE NOT NULL,
         password TEXT NOT NULL
     )''')
-    conn.execute('''CREATE TABLE IF NOT EXISTS services (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
+    cur.execute('''CREATE TABLE IF NOT EXISTS services (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id),
         service_name TEXT NOT NULL,
         description TEXT,
-        price REAL NOT NULL,
-        FOREIGN KEY (user_id) REFERENCES users(id)
+        price REAL NOT NULL
     )''')
     conn.commit()
+    cur.close()
     conn.close()
 
 def login_required(f):
@@ -67,12 +67,13 @@ def register():
         hashed = generate_password_hash(password)
         try:
             conn = get_db()
-            conn.execute('INSERT INTO users (name, email, password) VALUES (?, ?, ?)', (name, email, hashed))
+            cur = conn.cursor()
+            cur.execute('INSERT INTO users (name, email, password) VALUES (%s, %s, %s)', (name, email, hashed))
             conn.commit()
-            conn.close()
+            cur.close(); conn.close()
             flash('Account created! Please log in.', 'success')
             return redirect(url_for('login'))
-        except sqlite3.IntegrityError:
+        except Exception:
             flash('Email already registered.', 'error')
             return render_template('register.html')
     return render_template('register.html')
@@ -85,8 +86,10 @@ def login():
         email = request.form.get('email', '').strip()
         password = request.form.get('password', '')
         conn = get_db()
-        user = conn.execute('SELECT * FROM users WHERE email = ?', (email,)).fetchone()
-        conn.close()
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute('SELECT * FROM users WHERE email = %s', (email,))
+        user = cur.fetchone()
+        cur.close(); conn.close()
         if user and check_password_hash(user['password'], password):
             session['user_id'] = user['id']
             session['user_name'] = user['name']
@@ -99,18 +102,25 @@ def login():
 @login_required
 def dashboard():
     conn = get_db()
-    total_users = conn.execute('SELECT COUNT(*) FROM users').fetchone()[0]
-    total_services = conn.execute('SELECT COUNT(*) FROM services WHERE user_id = ?', (session['user_id'],)).fetchone()[0]
-    recent_services = conn.execute('SELECT * FROM services WHERE user_id = ? ORDER BY id DESC LIMIT 5', (session['user_id'],)).fetchall()
-    conn.close()
-    return render_template('dashboard.html', total_users=total_users, total_services=total_services, recent_services=recent_services)
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute('SELECT COUNT(*) as count FROM users')
+    total_users = cur.fetchone()['count']
+    cur.execute('SELECT COUNT(*) as count FROM services WHERE user_id = %s', (session['user_id'],))
+    total_services = cur.fetchone()['count']
+    cur.execute('SELECT * FROM services WHERE user_id = %s ORDER BY id DESC LIMIT 5', (session['user_id'],))
+    recent_services = cur.fetchall()
+    cur.close(); conn.close()
+    return render_template('dashboard.html', total_users=total_users,
+                           total_services=total_services, recent_services=recent_services)
 
 @app.route('/services')
 @login_required
 def services():
     conn = get_db()
-    all_services = conn.execute('SELECT * FROM services WHERE user_id = ? ORDER BY id DESC', (session['user_id'],)).fetchall()
-    conn.close()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute('SELECT * FROM services WHERE user_id = %s ORDER BY id DESC', (session['user_id'],))
+    all_services = cur.fetchall()
+    cur.close(); conn.close()
     return render_template('services.html', services=all_services)
 
 @app.route('/add_service', methods=['GET', 'POST'])
@@ -125,16 +135,16 @@ def add_service():
             return render_template('add_service.html')
         try:
             price = float(price)
-            if price < 0:
-                raise ValueError
+            if price < 0: raise ValueError
         except ValueError:
             flash('Please enter a valid price.', 'error')
             return render_template('add_service.html')
         conn = get_db()
-        conn.execute('INSERT INTO services (user_id, service_name, description, price) VALUES (?, ?, ?, ?)',
-                     (session['user_id'], name, desc, price))
+        cur = conn.cursor()
+        cur.execute('INSERT INTO services (user_id, service_name, description, price) VALUES (%s, %s, %s, %s)',
+                    (session['user_id'], name, desc, price))
         conn.commit()
-        conn.close()
+        cur.close(); conn.close()
         flash('Service added successfully!', 'success')
         return redirect(url_for('services'))
     return render_template('add_service.html')
@@ -143,41 +153,40 @@ def add_service():
 @login_required
 def edit_service(service_id):
     conn = get_db()
-    service = conn.execute('SELECT * FROM services WHERE id = ? AND user_id = ?', (service_id, session['user_id'])).fetchone()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute('SELECT * FROM services WHERE id = %s AND user_id = %s', (service_id, session['user_id']))
+    service = cur.fetchone()
     if not service:
-        conn.close()
+        cur.close(); conn.close()
         flash('Service not found.', 'error')
         return redirect(url_for('services'))
     if request.method == 'POST':
         name = request.form.get('service_name', '').strip()
         desc = request.form.get('description', '').strip()
         price = request.form.get('price', '')
-        if not name or not price:
-            flash('Service name and price are required.', 'error')
-            return render_template('edit_service.html', service=service)
         try:
             price = float(price)
-            if price < 0:
-                raise ValueError
+            if price < 0: raise ValueError
         except ValueError:
             flash('Please enter a valid price.', 'error')
             return render_template('edit_service.html', service=service)
-        conn.execute('UPDATE services SET service_name = ?, description = ?, price = ? WHERE id = ? AND user_id = ?',
-                     (name, desc, price, service_id, session['user_id']))
+        cur.execute('UPDATE services SET service_name=%s, description=%s, price=%s WHERE id=%s AND user_id=%s',
+                    (name, desc, price, service_id, session['user_id']))
         conn.commit()
-        conn.close()
+        cur.close(); conn.close()
         flash('Service updated successfully!', 'success')
         return redirect(url_for('services'))
-    conn.close()
+    cur.close(); conn.close()
     return render_template('edit_service.html', service=service)
 
 @app.route('/delete_service/<int:service_id>', methods=['POST'])
 @login_required
 def delete_service(service_id):
     conn = get_db()
-    conn.execute('DELETE FROM services WHERE id = ? AND user_id = ?', (service_id, session['user_id']))
+    cur = conn.cursor()
+    cur.execute('DELETE FROM services WHERE id = %s AND user_id = %s', (service_id, session['user_id']))
     conn.commit()
-    conn.close()
+    cur.close(); conn.close()
     flash('Service deleted.', 'success')
     return redirect(url_for('services'))
 
@@ -185,30 +194,32 @@ def delete_service(service_id):
 @login_required
 def profile():
     conn = get_db()
-    user = conn.execute('SELECT * FROM users WHERE id = ?', (session['user_id'],)).fetchone()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute('SELECT * FROM users WHERE id = %s', (session['user_id'],))
+    user = cur.fetchone()
     if request.method == 'POST':
         old_pw = request.form.get('old_password', '')
         new_pw = request.form.get('new_password', '')
         confirm = request.form.get('confirm_password', '')
         if not check_password_hash(user['password'], old_pw):
             flash('Current password is incorrect.', 'error')
-            conn.close()
+            cur.close(); conn.close()
             return render_template('profile.html', user=user)
         if len(new_pw) < 6:
             flash('New password must be at least 6 characters.', 'error')
-            conn.close()
+            cur.close(); conn.close()
             return render_template('profile.html', user=user)
         if new_pw != confirm:
             flash('New passwords do not match.', 'error')
-            conn.close()
+            cur.close(); conn.close()
             return render_template('profile.html', user=user)
         hashed = generate_password_hash(new_pw)
-        conn.execute('UPDATE users SET password = ? WHERE id = ?', (hashed, session['user_id']))
+        cur.execute('UPDATE users SET password = %s WHERE id = %s', (hashed, session['user_id']))
         conn.commit()
-        conn.close()
+        cur.close(); conn.close()
         flash('Password updated successfully!', 'success')
         return redirect(url_for('profile'))
-    conn.close()
+    cur.close(); conn.close()
     return render_template('profile.html', user=user)
 
 @app.route('/logout')
@@ -221,5 +232,4 @@ def logout():
 init_db()
 
 if __name__ == '__main__':
-	app.run(debug=False)
-    
+    app.run(debug=False)
